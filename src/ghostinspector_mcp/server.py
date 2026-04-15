@@ -332,6 +332,7 @@ def update_test(
     test_id: str,
     name: Optional[str] = None,
     start_url: Optional[str] = None,
+    suite_id: Optional[str] = None,
 ) -> str:
     """Update a test's properties.
 
@@ -339,6 +340,7 @@ def update_test(
         test_id: The ID of the test to update.
         name: New name for the test.
         start_url: New starting URL for the test.
+        suite_id: Move the test to a different suite.
 
     Returns:
         The updated test object.
@@ -349,6 +351,8 @@ def update_test(
         updates["name"] = name
     if start_url is not None:
         updates["startUrl"] = start_url
+    if suite_id is not None:
+        updates["suite"] = suite_id
     result = client.update_test(test_id, **updates)
     return format_response(result)
 

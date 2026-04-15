@@ -98,10 +98,10 @@ class GhostInspectorClient:
 
     def duplicate_test(self, test_id: str, suite_id: Optional[str] = None) -> dict:
         """Duplicate an existing test, optionally into a different suite."""
-        params = {}
+        data = {}
         if suite_id:
-            params["suiteId"] = suite_id
-        return self._request("POST", f"tests/{test_id}/duplicate", params=params)
+            data["suiteId"] = suite_id
+        return self._request("POST", f"tests/{test_id}/duplicate", json_data=data if data else None)
 
     def update_test(self, test_id: str, **kwargs) -> dict:
         """Update a test's properties."""
@@ -203,10 +203,10 @@ class GhostInspectorClient:
 
     def create_suite(self, name: str, organization_id: Optional[str] = None) -> dict:
         """Create a new test suite."""
-        params = {}
+        data = {"name": name}
         if organization_id:
-            params["organization"] = organization_id
-        return self._request("POST", "suites", params=params, json_data={"name": name})
+            data["organization"] = organization_id
+        return self._request("POST", "suites", json_data=data)
 
     def import_test(self, suite_id: str, test_definition: dict) -> dict:
         """Import a test into a suite from a JSON definition.
