@@ -90,7 +90,8 @@ Or if using uv:
 | `list_tests` | List all tests in your account (includes `importOnly` flag) |
 | `get_test` | Get detailed information about a specific test |
 | `execute_test` | Execute a test with optional parameters (browser, region, viewport, start URL) |
-| `duplicate_test` | Create a copy of an existing test |
+| `duplicate_test` | Create a copy of an existing test, optionally into a different suite |
+| `update_test` | Update test properties (name, start URL, suite, viewport) |
 | `execute_on_demand_test` | Run a test from JSON definition without saving it permanently |
 | `list_test_results` | List execution history for a test |
 | `get_test_result` | Get detailed result information |
@@ -100,6 +101,7 @@ Or if using uv:
 
 | Tool | Description |
 |------|-------------|
+| `create_suite` | Create a new test suite |
 | `list_suites` | List all test suites (includes resolved folder names) |
 | `get_suite` | Get suite details |
 | `execute_suite` | Execute all tests in a suite |
