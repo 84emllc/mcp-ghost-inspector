@@ -333,6 +333,7 @@ def update_test(
     name: Optional[str] = None,
     start_url: Optional[str] = None,
     suite_id: Optional[str] = None,
+    viewport: Optional[str] = None,
 ) -> str:
     """Update a test's properties.
 
@@ -341,6 +342,7 @@ def update_test(
         name: New name for the test.
         start_url: New starting URL for the test.
         suite_id: Move the test to a different suite.
+        viewport: Viewport size as 'WIDTHxHEIGHT' (e.g., '1440x900').
 
     Returns:
         The updated test object.
@@ -353,6 +355,9 @@ def update_test(
         updates["startUrl"] = start_url
     if suite_id is not None:
         updates["suite"] = suite_id
+    if viewport is not None:
+        w, h = viewport.split("x")
+        updates["viewportSize"] = {"width": int(w), "height": int(h)}
     result = client.update_test(test_id, **updates)
     return format_response(result)
 
