@@ -312,17 +312,44 @@ def cancel_test_result(result_id: str) -> str:
 
 
 @mcp.tool()
-def duplicate_test(test_id: str) -> str:
+def duplicate_test(test_id: str, suite_id: Optional[str] = None) -> str:
     """Duplicate an existing test to create a copy.
 
     Args:
         test_id: The ID of the test to duplicate.
+        suite_id: Optional suite ID to duplicate the test into. If omitted, duplicates within the same suite.
 
     Returns:
         The newly created test object with its new ID.
     """
     client = get_client()
-    result = client.duplicate_test(test_id)
+    result = client.duplicate_test(test_id, suite_id=suite_id)
+    return format_response(result)
+
+
+@mcp.tool()
+def update_test(
+    test_id: str,
+    name: Optional[str] = None,
+    start_url: Optional[str] = None,
+) -> str:
+    """Update a test's properties.
+
+    Args:
+        test_id: The ID of the test to update.
+        name: New name for the test.
+        start_url: New starting URL for the test.
+
+    Returns:
+        The updated test object.
+    """
+    client = get_client()
+    updates = {}
+    if name is not None:
+        updates["name"] = name
+    if start_url is not None:
+        updates["startUrl"] = start_url
+    result = client.update_test(test_id, **updates)
     return format_response(result)
 
 
@@ -382,6 +409,22 @@ def execute_on_demand_test(
 
 
 # ==================== Suite Tools ====================
+
+
+@mcp.tool()
+def create_suite(name: str, organization_id: Optional[str] = None) -> str:
+    """Create a new test suite.
+
+    Args:
+        name: Name for the new suite.
+        organization_id: Optional organization ID to create the suite in.
+
+    Returns:
+        The newly created suite object with its ID.
+    """
+    client = get_client()
+    result = client.create_suite(name, organization_id=organization_id)
+    return format_response(result)
 
 
 @mcp.tool()

@@ -96,9 +96,16 @@ class GhostInspectorClient:
         """Cancel a running test result."""
         return self._request("POST", f"results/{result_id}/cancel")
 
-    def duplicate_test(self, test_id: str) -> dict:
-        """Duplicate an existing test."""
-        return self._request("POST", f"tests/{test_id}/duplicate")
+    def duplicate_test(self, test_id: str, suite_id: Optional[str] = None) -> dict:
+        """Duplicate an existing test, optionally into a different suite."""
+        params = {}
+        if suite_id:
+            params["suiteId"] = suite_id
+        return self._request("POST", f"tests/{test_id}/duplicate", params=params)
+
+    def update_test(self, test_id: str, **kwargs) -> dict:
+        """Update a test's properties."""
+        return self._request("POST", f"tests/{test_id}", json_data=kwargs)
 
     def execute_on_demand_test(
         self,
@@ -193,6 +200,13 @@ class GhostInspectorClient:
     def list_suite_result_tests(self, result_id: str) -> list[dict]:
         """List test results within a suite result."""
         return self._request("GET", f"suite-results/{result_id}/results")
+
+    def create_suite(self, name: str, organization_id: Optional[str] = None) -> dict:
+        """Create a new test suite."""
+        params = {}
+        if organization_id:
+            params["organization"] = organization_id
+        return self._request("POST", "suites", params=params, json_data={"name": name})
 
     def import_test(self, suite_id: str, test_definition: dict) -> dict:
         """Import a test into a suite from a JSON definition.
