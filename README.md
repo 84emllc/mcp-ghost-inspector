@@ -1,5 +1,7 @@
 # Ghost Inspector MCP Server
 
+Originally created by [James Spibey / Tempest](https://github.com/tempestim/ghostinspector-mcp-server).
+
 An MCP (Model Context Protocol) server for interacting with [Ghost Inspector](https://ghostinspector.com/), an automated browser testing platform.
 
 ## Features
