@@ -421,18 +421,69 @@ def execute_on_demand_test(
 
 
 @mcp.tool()
-def create_suite(name: str, organization_id: Optional[str] = None) -> str:
+def create_suite(
+    name: str,
+    organization_id: Optional[str] = None,
+    folder_id: Optional[str] = None,
+) -> str:
     """Create a new test suite.
 
     Args:
         name: Name for the new suite.
         organization_id: Optional organization ID to create the suite in.
+        folder_id: Optional folder ID to place the new suite in.
 
     Returns:
         The newly created suite object with its ID.
     """
     client = get_client()
-    result = client.create_suite(name, organization_id=organization_id)
+    result = client.create_suite(
+        name, organization_id=organization_id, folder_id=folder_id
+    )
+    return format_response(result)
+
+
+@mcp.tool()
+def update_suite(
+    suite_id: str,
+    name: Optional[str] = None,
+    folder_id: Optional[str] = None,
+) -> str:
+    """Update a suite's properties (rename or move between folders).
+
+    Args:
+        suite_id: The ID of the suite to update.
+        name: New name for the suite.
+        folder_id: Move the suite to a different folder. Pass an empty string
+            to move the suite out of any folder (to the unorganized root).
+
+    Returns:
+        The updated suite object.
+    """
+    client = get_client()
+    updates: dict = {}
+    if name is not None:
+        updates["name"] = name
+    if folder_id is not None:
+        updates["folder"] = folder_id
+    if not updates:
+        return format_response({"error": "No fields to update"})
+    result = client.update_suite(suite_id, **updates)
+    return format_response(result)
+
+
+@mcp.tool()
+def delete_suite(suite_id: str) -> str:
+    """Delete a suite and all of its tests. Destructive; use with care.
+
+    Args:
+        suite_id: The ID of the suite to delete.
+
+    Returns:
+        Confirmation from the API.
+    """
+    client = get_client()
+    result = client.delete_suite(suite_id)
     return format_response(result)
 
 
@@ -731,6 +782,53 @@ def list_folder_suites(folder_id: str) -> str:
         for s in suites
     ]
     return format_response(simplified)
+
+
+@mcp.tool()
+def create_folder(name: str, organization_id: Optional[str] = None) -> str:
+    """Create a new folder.
+
+    Args:
+        name: Name for the new folder.
+        organization_id: Optional organization ID to create the folder in.
+
+    Returns:
+        The newly created folder object with its ID.
+    """
+    client = get_client()
+    result = client.create_folder(name, organization_id=organization_id)
+    return format_response(result)
+
+
+@mcp.tool()
+def update_folder(folder_id: str, name: str) -> str:
+    """Rename an existing folder.
+
+    Args:
+        folder_id: The ID of the folder to update.
+        name: New name for the folder.
+
+    Returns:
+        The updated folder object.
+    """
+    client = get_client()
+    result = client.update_folder(folder_id, name=name)
+    return format_response(result)
+
+
+@mcp.tool()
+def delete_folder(folder_id: str) -> str:
+    """Delete a folder. Contained suites are moved out of the folder, not deleted.
+
+    Args:
+        folder_id: The ID of the folder to delete.
+
+    Returns:
+        Confirmation from the API.
+    """
+    client = get_client()
+    result = client.delete_folder(folder_id)
+    return format_response(result)
 
 
 # ==================== Organization Tools ====================
