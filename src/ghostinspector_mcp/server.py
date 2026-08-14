@@ -2,7 +2,7 @@
 
 import json
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from mcp.server.fastmcp import FastMCP
 
@@ -327,6 +327,34 @@ def duplicate_test(test_id: str, suite_id: Optional[str] = None) -> str:
     return format_response(result)
 
 
+def coerce_steps(steps: Any) -> list:
+    """Accept steps as a JSON string or an already-parsed list.
+
+    MCP clients frequently parse JSON-looking arguments before sending them, so
+    a string-only parameter would reject perfectly valid input.
+    """
+    if isinstance(steps, list):
+        return steps
+    if isinstance(steps, str):
+        parsed = json.loads(steps)
+        if not isinstance(parsed, list):
+            raise ValueError("steps must be a JSON array")
+        return parsed
+    raise ValueError(f"steps must be a JSON array or array string, got {type(steps).__name__}")
+
+
+def normalize_steps(steps: list) -> list[dict]:
+    """Reduce steps to the fields that define behavior, for comparison."""
+    return [
+        {
+            "command": step.get("command", ""),
+            "target": step.get("target") or "",
+            "value": step.get("value") or "",
+        }
+        for step in steps
+    ]
+
+
 @mcp.tool()
 def update_test(
     test_id: str,
@@ -334,8 +362,10 @@ def update_test(
     start_url: Optional[str] = None,
     suite_id: Optional[str] = None,
     viewport: Optional[str] = None,
+    steps: Optional[Union[str, list]] = None,
+    steps_mode: str = "replace",
 ) -> str:
-    """Update a test's properties.
+    """Update a test's properties, including its steps.
 
     Args:
         test_id: The ID of the test to update.
@@ -343,9 +373,18 @@ def update_test(
         start_url: New starting URL for the test.
         suite_id: Move the test to a different suite.
         viewport: Viewport size as 'WIDTHxHEIGHT' (e.g., '1440x900').
+        steps: JSON array of test steps. Each step needs 'command', and usually
+               'target' and/or 'value'. See import_test for the command list.
+               Example: '[{"command": "assertEval", "target": "", "value": "return true;"}]'
+        steps_mode: 'replace' (default) overwrites all steps with the supplied
+                    array. 'append' adds the supplied steps after the existing
+                    ones.
 
     Returns:
-        The updated test object.
+        The updated test object. When steps are supplied, the test is re-fetched
+        afterwards and the saved steps are compared against what was sent. The
+        response includes a 'stepVerification' object reporting whether the
+        change actually persisted.
     """
     client = get_client()
     updates = {}
@@ -358,7 +397,71 @@ def update_test(
     if viewport is not None:
         w, h = viewport.split("x")
         updates["viewportSize"] = {"width": int(w), "height": int(h)}
+
+    intended_steps = None
+    if steps is not None:
+        if steps_mode not in ("replace", "append"):
+            return format_response(
+                {"error": f"steps_mode must be 'replace' or 'append', got '{steps_mode}'"}
+            )
+        try:
+            supplied_steps = coerce_steps(steps)
+        except (json.JSONDecodeError, ValueError) as e:
+            return format_response({"error": f"Invalid steps: {e}"})
+
+        if steps_mode == "append":
+            existing = client.get_test(test_id).get("steps", [])
+            intended_steps = list(existing) + list(supplied_steps)
+        else:
+            intended_steps = list(supplied_steps)
+
+        for sequence, step in enumerate(intended_steps):
+            step["sequence"] = sequence
+        updates["steps"] = intended_steps
+
+    if not updates:
+        return format_response({"error": "No updates supplied"})
+
     result = client.update_test(test_id, **updates)
+
+    if intended_steps is not None:
+        saved = client.get_test(test_id).get("steps", [])
+        expected = normalize_steps(intended_steps)
+        actual = normalize_steps(saved)
+        matched = expected == actual
+        verification = {
+            "applied": matched,
+            "expectedStepCount": len(expected),
+            "savedStepCount": len(actual),
+        }
+        if not matched:
+            verification["warning"] = (
+                "Ghost Inspector did not save the supplied steps. The update "
+                "endpoint may ignore the 'steps' field. Steps were NOT changed "
+                "as requested; verify in the Ghost Inspector UI before relying "
+                "on this test."
+            )
+            verification["savedSteps"] = actual
+        result = dict(result)
+        result["stepVerification"] = verification
+
+    return format_response(result)
+
+
+@mcp.tool()
+def delete_test(test_id: str) -> str:
+    """Permanently delete a test.
+
+    This cannot be undone. Confirm the test ID with get_test before calling.
+
+    Args:
+        test_id: The ID of the test to delete.
+
+    Returns:
+        The API response confirming deletion.
+    """
+    client = get_client()
+    result = client.delete_test(test_id)
     return format_response(result)
 
 
@@ -367,7 +470,7 @@ def execute_on_demand_test(
     org_id: str,
     name: str,
     start_url: str,
-    steps: str,
+    steps: Union[str, list],
     browser: Optional[str] = None,
     region: Optional[str] = None,
     viewport: Optional[str] = None,
@@ -394,11 +497,10 @@ def execute_on_demand_test(
         Test execution result.
     """
     client = get_client()
-    # Parse the steps JSON
     try:
-        steps_list = json.loads(steps)
-    except json.JSONDecodeError as e:
-        return format_response({"error": f"Invalid steps JSON: {e}"})
+        steps_list = coerce_steps(steps)
+    except (json.JSONDecodeError, ValueError) as e:
+        return format_response({"error": f"Invalid steps: {e}"})
 
     test_definition = {
         "name": name,
@@ -421,18 +523,69 @@ def execute_on_demand_test(
 
 
 @mcp.tool()
-def create_suite(name: str, organization_id: Optional[str] = None) -> str:
+def create_suite(
+    name: str,
+    organization_id: Optional[str] = None,
+    folder_id: Optional[str] = None,
+) -> str:
     """Create a new test suite.
 
     Args:
         name: Name for the new suite.
         organization_id: Optional organization ID to create the suite in.
+        folder_id: Optional folder ID to place the new suite in.
 
     Returns:
         The newly created suite object with its ID.
     """
     client = get_client()
-    result = client.create_suite(name, organization_id=organization_id)
+    result = client.create_suite(
+        name, organization_id=organization_id, folder_id=folder_id
+    )
+    return format_response(result)
+
+
+@mcp.tool()
+def update_suite(
+    suite_id: str,
+    name: Optional[str] = None,
+    folder_id: Optional[str] = None,
+) -> str:
+    """Update a suite's properties (rename or move between folders).
+
+    Args:
+        suite_id: The ID of the suite to update.
+        name: New name for the suite.
+        folder_id: Move the suite to a different folder. Pass an empty string
+            to move the suite out of any folder (to the unorganized root).
+
+    Returns:
+        The updated suite object.
+    """
+    client = get_client()
+    updates: dict = {}
+    if name is not None:
+        updates["name"] = name
+    if folder_id is not None:
+        updates["folder"] = folder_id
+    if not updates:
+        return format_response({"error": "No fields to update"})
+    result = client.update_suite(suite_id, **updates)
+    return format_response(result)
+
+
+@mcp.tool()
+def delete_suite(suite_id: str) -> str:
+    """Delete a suite and all of its tests. Destructive; use with care.
+
+    Args:
+        suite_id: The ID of the suite to delete.
+
+    Returns:
+        Confirmation from the API.
+    """
+    client = get_client()
+    result = client.delete_suite(suite_id)
     return format_response(result)
 
 
@@ -635,7 +788,7 @@ def import_test(
     suite_id: str,
     name: str,
     start_url: str,
-    steps: str,
+    steps: Union[str, list],
 ) -> str:
     """Import a test into a suite, permanently saving it.
 
@@ -647,19 +800,21 @@ def import_test(
         start_url: The URL where the test should start.
         steps: JSON array of test steps. Each step should have 'command' and 'target'.
                Example: '[{"command": "click", "target": ".button"}, {"command": "type", "target": "#email", "value": "test@example.com"}]'
-               Available commands: click, type, open, assertTextPresent, assertElementPresent,
-               assertElementVisible, assertElementNotPresent, extract, extractEval, eval,
-               mouseOver, dragAndDrop, keypress, pause, screenshot, refresh, exit.
+               Commands include (non-exhaustive): click, type, assign, open, assertEval,
+               assertTextPresent, assertElementPresent, assertElementVisible,
+               assertElementNotPresent, extract, extractEval, eval, mouseOver,
+               dragAndDrop, keypress, pause, screenshot, refresh, exit.
+               assertEval takes an empty target and a JS body in 'value' that
+               returns a boolean.
 
     Returns:
         The newly created test object with its ID.
     """
     client = get_client()
-    # Parse the steps JSON
     try:
-        steps_list = json.loads(steps)
-    except json.JSONDecodeError as e:
-        return format_response({"error": f"Invalid steps JSON: {e}"})
+        steps_list = coerce_steps(steps)
+    except (json.JSONDecodeError, ValueError) as e:
+        return format_response({"error": f"Invalid steps: {e}"})
 
     test_definition = {
         "name": name,
@@ -731,6 +886,53 @@ def list_folder_suites(folder_id: str) -> str:
         for s in suites
     ]
     return format_response(simplified)
+
+
+@mcp.tool()
+def create_folder(name: str, organization_id: Optional[str] = None) -> str:
+    """Create a new folder.
+
+    Args:
+        name: Name for the new folder.
+        organization_id: Optional organization ID to create the folder in.
+
+    Returns:
+        The newly created folder object with its ID.
+    """
+    client = get_client()
+    result = client.create_folder(name, organization_id=organization_id)
+    return format_response(result)
+
+
+@mcp.tool()
+def update_folder(folder_id: str, name: str) -> str:
+    """Rename an existing folder.
+
+    Args:
+        folder_id: The ID of the folder to update.
+        name: New name for the folder.
+
+    Returns:
+        The updated folder object.
+    """
+    client = get_client()
+    result = client.update_folder(folder_id, name=name)
+    return format_response(result)
+
+
+@mcp.tool()
+def delete_folder(folder_id: str) -> str:
+    """Delete a folder. Contained suites are moved out of the folder, not deleted.
+
+    Args:
+        folder_id: The ID of the folder to delete.
+
+    Returns:
+        Confirmation from the API.
+    """
+    client = get_client()
+    result = client.delete_folder(folder_id)
+    return format_response(result)
 
 
 # ==================== Organization Tools ====================

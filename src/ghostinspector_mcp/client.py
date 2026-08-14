@@ -107,6 +107,10 @@ class GhostInspectorClient:
         """Update a test's properties."""
         return self._request("POST", f"tests/{test_id}", json_data=kwargs)
 
+    def delete_test(self, test_id: str) -> dict:
+        """Delete a test."""
+        return self._request("DELETE", f"tests/{test_id}")
+
     def execute_on_demand_test(
         self,
         org_id: str,
@@ -201,12 +205,27 @@ class GhostInspectorClient:
         """List test results within a suite result."""
         return self._request("GET", f"suite-results/{result_id}/results")
 
-    def create_suite(self, name: str, organization_id: Optional[str] = None) -> dict:
+    def create_suite(
+        self,
+        name: str,
+        organization_id: Optional[str] = None,
+        folder_id: Optional[str] = None,
+    ) -> dict:
         """Create a new test suite."""
         data = {"name": name}
         if organization_id:
             data["organization"] = organization_id
+        if folder_id:
+            data["folder"] = folder_id
         return self._request("POST", "suites", json_data=data)
+
+    def update_suite(self, suite_id: str, **kwargs) -> dict:
+        """Update a suite's properties (e.g. name, folder)."""
+        return self._request("POST", f"suites/{suite_id}", json_data=kwargs)
+
+    def delete_suite(self, suite_id: str) -> dict:
+        """Delete a suite."""
+        return self._request("DELETE", f"suites/{suite_id}")
 
     def import_test(self, suite_id: str, test_definition: dict) -> dict:
         """Import a test into a suite from a JSON definition.
@@ -230,6 +249,25 @@ class GhostInspectorClient:
     def list_folder_suites(self, folder_id: str) -> list[dict]:
         """List all suites in a folder."""
         return self._request("GET", f"folders/{folder_id}/suites")
+
+    def create_folder(
+        self, name: str, organization_id: Optional[str] = None
+    ) -> dict:
+        """Create a new folder."""
+        data = {"name": name}
+        if organization_id:
+            data["organization"] = organization_id
+        return self._request("POST", "folders", json_data=data)
+
+    def update_folder(self, folder_id: str, name: str) -> dict:
+        """Update a folder's properties."""
+        return self._request(
+            "POST", f"folders/{folder_id}", json_data={"name": name}
+        )
+
+    def delete_folder(self, folder_id: str) -> dict:
+        """Delete a folder."""
+        return self._request("DELETE", f"folders/{folder_id}")
 
     # ==================== Organizations ====================
 
