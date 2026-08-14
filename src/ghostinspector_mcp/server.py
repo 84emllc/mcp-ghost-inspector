@@ -494,7 +494,9 @@ def execute_on_demand_test(
         immediate: If True, return immediately without waiting for completion.
 
     Returns:
-        Test execution result.
+        Test execution result. This endpoint returns as soon as the run is
+        created, so the result may still be in progress; fetch the finished
+        result with get_test_result using the returned id.
     """
     client = get_client()
     try:

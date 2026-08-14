@@ -125,7 +125,7 @@ class GhostInspectorClient:
 
         The test is executed but not permanently saved to the account.
         """
-        params = {"organizationId": org_id}
+        params = {}
         if start_url:
             params["startUrl"] = start_url
         if browser:
@@ -138,7 +138,10 @@ class GhostInspectorClient:
             params["immediate"] = "true"
 
         return self._request(
-            "POST", "tests/on-demand/execute", params=params, json_data=test_definition
+            "POST",
+            f"organizations/{org_id}/on-demand/execute",
+            params=params,
+            json_data=test_definition,
         )
 
     # ==================== Suites ====================
