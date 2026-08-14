@@ -91,7 +91,8 @@ Or if using uv:
 | `get_test` | Get detailed information about a specific test |
 | `execute_test` | Execute a test with optional parameters (browser, region, viewport, start URL) |
 | `duplicate_test` | Create a copy of an existing test, optionally into a different suite |
-| `update_test` | Update test properties (name, start URL, suite, viewport) |
+| `update_test` | Update test properties (name, start URL, suite, viewport) and replace or append steps, with verification that the steps actually saved |
+| `delete_test` | Permanently delete a test |
 | `execute_on_demand_test` | Run a test from JSON definition without saving it permanently |
 | `list_test_results` | List execution history for a test |
 | `get_test_result` | Get detailed result information |
@@ -163,6 +164,10 @@ Tests marked with `importOnly=true` are modules. They:
 
 You can create tests programmatically using either `import_test` (saves permanently) or `execute_on_demand_test` (runs without saving).
 
+To change the steps of a test that already exists, use `update_test` with `steps` and `steps_mode`. `replace` overwrites every step, `append` adds the supplied steps after the existing ones. Sequence numbers are assigned automatically.
+
+The Ghost Inspector API does not document `steps` as an accepted field on the test update endpoint, but it honors it. Because that behavior is undocumented and could change, `update_test` re-fetches the test after writing and compares the saved steps against what was sent, returning the outcome in `stepVerification`. Check `stepVerification.applied` before trusting an update.
+
 ### Test Step Format
 
 Steps are defined as a JSON array. Each step has:
@@ -182,6 +187,7 @@ Steps are defined as a JSON array. Each step has:
 | `assertElementVisible` | Verify element is visible | `{"command": "assertElementVisible", "target": "#modal"}` |
 | `extract` | Extract text to a variable | `{"command": "extract", "target": ".user-id", "value": "userId"}` |
 | `eval` | Execute JavaScript | `{"command": "eval", "value": "document.title"}` |
+| `assertEval` | Assert a JavaScript expression returns true | `{"command": "assertEval", "target": "", "value": "return document.title === 'Home';"}` |
 | `pause` | Wait for milliseconds | `{"command": "pause", "value": "2000"}` |
 | `screenshot` | Take a screenshot | `{"command": "screenshot"}` |
 | `mouseOver` | Hover over element | `{"command": "mouseOver", "target": ".dropdown"}` |

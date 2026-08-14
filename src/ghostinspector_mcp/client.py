@@ -107,6 +107,10 @@ class GhostInspectorClient:
         """Update a test's properties."""
         return self._request("POST", f"tests/{test_id}", json_data=kwargs)
 
+    def delete_test(self, test_id: str) -> dict:
+        """Delete a test."""
+        return self._request("DELETE", f"tests/{test_id}")
+
     def execute_on_demand_test(
         self,
         org_id: str,
